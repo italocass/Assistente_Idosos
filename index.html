@@ -7,7 +7,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
     <style>
-        /* Design de alto contraste para acessibilidade */
         body { 
             background-color: #121212; 
             color: #FFD700; 
@@ -15,12 +14,11 @@
             text-align: center; 
             margin: 0; 
             padding: 15px; 
-            overflow-x: hidden; /* Evita rolagem horizontal no celular */
+            overflow-x: hidden; 
         }
         h1 { font-size: 2em; margin-bottom: 5px; }
         #instrucao { font-size: 1.2em; color: #FFFFFF; margin-bottom: 15px; }
         
-        /* Área de resultado destacada e com fonte grande */
         #resultado { 
             font-size: 1.5em; 
             margin: 10px auto; 
@@ -32,104 +30,115 @@
             max-width: 400px;
         }
         
-        /* Estilização da área da câmera */
+        /* Oculta o canvas da câmera até o botão ser clicado */
         canvas { 
             border: 4px solid #FFD700; 
             border-radius: 10px; 
             margin-top: 10px; 
             max-width: 100%; 
-            height: auto; /* Mantém a proporção correta no ecrã */
+            height: auto; 
+            display: none; 
+        }
+
+        /* Estilo do botão de ligar */
+        button { 
+            background-color: #FFD700; 
+            color: #121212; 
+            font-size: 1.5em; 
+            font-weight: bold; 
+            padding: 15px 30px; 
+            border: none; 
+            border-radius: 10px; 
+            margin-top: 20px; 
+            cursor: pointer; 
         }
     </style>
 </head>
 <body>
 
     <h1>Assistente Visual</h1>
-    <p id="instrucao">Aponte a câmera para um objeto</p>
+    <p id="instrucao">Aperte o botão para começar</p>
     
-    <div id="resultado">Iniciando Inteligência Artificial...</div>
+    <button id="btnLigar" onclick="iniciarSistema()">Ligar Câmera</button>
+    
+    <div id="resultado" style="display: none;">Aguardando permissão...</div>
 
     <script>
         let video;
         let detector;
         let deteccoes = [];
+        let sistemaIniciado = false;
 
-        // Função de configuração inicial (roda uma vez)
+        // Configuração inicial da tela (roda sozinho)
         function setup() {
-            // Criando o canvas com um tamanho que se adapte melhor ao celular (320x480)
             let canvas = createCanvas(320, 480);
             canvas.parent(document.body);
-            
-            // Configuração específica para mobile: forçar a câmera traseira
+            canvas.id('meuCanvas'); // Cria um ID para podermos manipular no CSS depois
+        }
+
+        // Função que só roda quando o usuário clica no botão
+        function iniciarSistema() {
+            document.getElementById('btnLigar').style.display = 'none'; // Esconde o botão
+            document.getElementById('resultado').style.display = 'block'; // Mostra a caixa de texto
+            document.getElementById('resultado').innerText = "Solicitando permissão da câmera...";
+
             let constraints = {
-                video: {
-                    facingMode: "environment" // "user" seria a câmera frontal
-                },
+                video: { facingMode: "environment" },
                 audio: false
             };
             
-            // Inicializa a webcam com as configurações de celular
-            video = createCapture(constraints);
-            
-            // Essa linha é OBRIGATÓRIA para a câmera funcionar no iPhone/Safari e não abrir em tela cheia
-            video.elt.setAttribute('playsinline', '');
+            // Inicializa a câmera
+            video = createCapture(constraints, function(stream) {
+                // Esse bloco só roda quando você clica em "Permitir" no celular
+                document.getElementById('resultado').innerText = "Carregando IA... (Pode demorar uns segundos)";
+                document.getElementById('meuCanvas').style.display = 'inline'; 
+                video.elt.setAttribute('playsinline', '');
+                
+                // Carrega o modelo de Machine Learning COCO-SSD
+                detector = ml5.objectDetector('cocossd', modelReady);
+                sistemaIniciado = true;
+            });
             
             video.size(320, 480);
-            video.hide(); // Esconde o vídeo HTML nativo para desenhar no nosso Canvas
-            
-            // Carrega o modelo de Machine Learning COCO-SSD
-            detector = ml5.objectDetector('cocossd', modelReady);
+            video.hide(); 
         }
 
-        // Função chamada quando o modelo de IA termina de carregar
+        // Função chamada quando a IA termina de baixar no navegador
         function modelReady() {
-            document.getElementById('resultado').innerText = "Sistema Pronto!";
-            detectar(); // Inicia o loop de detecção contínua
+            document.getElementById('resultado').innerText = "Sistema Pronto! Aponte para um objeto.";
+            detectar(); 
         }
 
-        // Função que processa os frames do vídeo e classifica os objetos
         function detectar() {
             detector.detect(video, function(error, results) {
-                if (error) { 
-                    console.error(error); 
-                    return; 
-                }
-                
+                if (error) { console.error(error); return; }
                 deteccoes = results;
                 
                 if (deteccoes.length > 0) {
-                    // Seleciona o objeto detectado com maior nível de acurácia (confidence)
                     let objetoPrincipal = deteccoes[0].label;
                     let confianca = (deteccoes[0].confidence * 100).toFixed(0);
-                    
                     document.getElementById('resultado').innerText = `Vejo: ${objetoPrincipal.toUpperCase()} (${confianca}% de certeza)`;
                 } else {
                     document.getElementById('resultado').innerText = "Procurando objetos...";
                 }
-                
-                detectar(); // Loop contínuo para atualizar em tempo real
+                detectar();
             });
         }
 
-        // Função de desenho para renderizar a câmera e as caixas delimitadoras
         function draw() {
-            // Desenha o vídeo ocupando o tamanho total do canvas
-            image(video, 0, 0, width, height); 
-            
-            for (let i = 0; i < deteccoes.length; i++) {
-                let objeto = deteccoes[i];
-                
-                // Desenha a caixa ao redor do objeto
-                stroke(255, 215, 0); // Amarelo
-                strokeWeight(4);
-                noFill();
-                rect(objeto.x, objeto.y, objeto.width, objeto.height);
-                
-                // Escreve o nome do objeto (label) acima da caixa
-                noStroke();
-                fill(255, 215, 0);
-                textSize(20);
-                text(objeto.label, objeto.x + 5, objeto.y + 20);
+            if(sistemaIniciado) {
+                image(video, 0, 0, width, height); 
+                for (let i = 0; i < deteccoes.length; i++) {
+                    let objeto = deteccoes[i];
+                    stroke(255, 215, 0); 
+                    strokeWeight(4);
+                    noFill();
+                    rect(objeto.x, objeto.y, objeto.width, objeto.height);
+                    noStroke();
+                    fill(255, 215, 0);
+                    textSize(20);
+                    text(objeto.label, objeto.x + 5, objeto.y + 20);
+                }
             }
         }
     </script>
