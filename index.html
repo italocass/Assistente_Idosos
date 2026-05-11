@@ -67,6 +67,36 @@
         let deteccoes = [];
         let sistemaIniciado = false;
         let videoElement;
+        
+        // Variáveis de controle para a voz não ficar repetitiva
+        let ultimoObjetoFalado = "";
+        let tempoUltimaFala = 0;
+
+        // Dicionário completo de tradução da Inteligência Artificial
+        const dicionario = {
+            "person": "pessoa", "bicycle": "bicicleta", "car": "carro", "motorcycle": "moto",
+            "airplane": "avião", "bus": "ônibus", "train": "trem", "truck": "caminhão",
+            "boat": "barco", "traffic light": "semáforo", "fire hydrant": "hidrante",
+            "stop sign": "placa de pare", "parking meter": "parquímetro", "bench": "banco",
+            "bird": "pássaro", "cat": "gato", "dog": "cachorro", "horse": "cavalo",
+            "sheep": "ovelha", "cow": "vaca", "elephant": "elefante", "bear": "urso",
+            "zebra": "zebra", "giraffe": "girafa", "backpack": "mochila", "umbrella": "guarda-chuva",
+            "handbag": "bolsa", "tie": "gravata", "suitcase": "mala", "frisbee": "frisbee",
+            "skis": "esquis", "snowboard": "snowboard", "sports ball": "bola",
+            "kite": "pipa", "baseball bat": "taco", "baseball glove": "luva",
+            "skateboard": "skate", "surfboard": "prancha de surfe", "tennis racket": "raquete",
+            "bottle": "garrafa", "wine glass": "taça", "cup": "copo", "fork": "garfo",
+            "knife": "faca", "spoon": "colher", "bowl": "tigela", "banana": "banana",
+            "apple": "maçã", "sandwich": "sanduíche", "orange": "laranja", "broccoli": "brócolis",
+            "carrot": "cenoura", "hot dog": "cachorro-quente", "pizza": "pizza", "donut": "donut",
+            "cake": "bolo", "chair": "cadeira", "couch": "sofá", "potted plant": "planta",
+            "bed": "cama", "dining table": "mesa", "toilet": "vaso sanitário",
+            "tv": "televisão", "laptop": "notebook", "mouse": "mouse", "remote": "controle remoto",
+            "keyboard": "teclado", "cell phone": "celular", "microwave": "micro-ondas",
+            "oven": "forno", "toaster": "torradeira", "sink": "pia", "refrigerator": "geladeira",
+            "book": "livro", "clock": "relógio", "vase": "vaso", "scissors": "tesoura",
+            "teddy bear": "urso de pelúcia", "hair drier": "secador de cabelo", "toothbrush": "escova de dentes"
+        };
 
         function setup() {
             let canvas = createCanvas(320, 480);
@@ -75,10 +105,24 @@
             videoElement = document.getElementById('videoNativo');
         }
 
+        // Função responsável por fazer o celular falar
+        function falar(texto) {
+            if ('speechSynthesis' in window && !window.speechSynthesis.speaking) {
+                let mensagem = new SpeechSynthesisUtterance(texto);
+                mensagem.lang = 'pt-BR'; // Força sotaque brasileiro
+                mensagem.rate = 0.9;     // Deixa a voz ligeiramente mais devagar para o idoso
+                window.speechSynthesis.speak(mensagem);
+            }
+        }
+
         async function iniciarSistema() {
             document.getElementById('btnLigar').style.display = 'none'; 
             document.getElementById('resultado').style.display = 'block'; 
-            document.getElementById('resultado').innerText = "Solicitando permissão da câmera...";
+            document.getElementById('resultado').innerText = "Solicitando permissão...";
+
+            // Macete da Apple: A primeira fala PRECISA acontecer logo após o clique do botão
+            // para "destrancar" o áudio no Safari.
+            falar("Iniciando assistente");
 
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -90,41 +134,51 @@
                 
                 videoElement.onloadedmetadata = () => {
                     videoElement.play();
-                    
-                    // CORREÇÃO 2: Reforço as dimensões no JavaScript antes de chamar a IA
                     videoElement.width = 320;
                     videoElement.height = 480;
                     
-                    document.getElementById('resultado').innerText = "Carregando IA... (Pode demorar uns segundos)";
+                    document.getElementById('resultado').innerText = "Carregando Inteligência Artificial...";
                     document.getElementById('meuCanvas').style.display = 'inline'; 
                     
-                    // CORREÇÃO 3: Passamos o vídeo DIRETAMENTE na inicialização para a IA não se perder
                     detector = ml5.objectDetector('cocossd', videoElement, modelReady);
                     sistemaIniciado = true;
                 };
 
             } catch (erro) {
                 document.getElementById('resultado').innerText = "Erro: " + erro.message;
-                console.error(erro);
             }
         }
 
         function modelReady() {
-            document.getElementById('resultado').innerText = "Sistema Pronto! Aponte para um objeto.";
+            document.getElementById('resultado').innerText = "Pronto! Aponte para algo.";
             detectar(); 
         }
 
         function detectar() {
             detector.detect(videoElement, function(error, results) {
-                if (error) { console.error(error); return; }
+                if (error) { return; }
                 deteccoes = results;
                 
                 if (deteccoes.length > 0) {
-                    let objetoPrincipal = deteccoes[0].label;
+                    let nomeOriginal = deteccoes[0].label;
                     let confianca = (deteccoes[0].confidence * 100).toFixed(0);
-                    document.getElementById('resultado').innerText = `Vejo: ${objetoPrincipal.toUpperCase()} (${confianca}% de certeza)`;
+                    
+                    // Busca a tradução no dicionário. Se não achar, usa o original em inglês
+                    let nomeTraduzido = dicionario[nomeOriginal] || nomeOriginal;
+
+                    document.getElementById('resultado').innerText = `Vejo: ${nomeTraduzido.toUpperCase()} (${confianca}%)`;
+
+                    // Lógica para falar o objeto identificado
+                    let agora = Date.now();
+                    // Só fala se for um objeto diferente, ou se já passaram 4 segundos (4000 ms)
+                    if (nomeTraduzido !== ultimoObjetoFalado || (agora - tempoUltimaFala > 4000)) {
+                        falar(nomeTraduzido);
+                        ultimoObjetoFalado = nomeTraduzido;
+                        tempoUltimaFala = agora;
+                    }
+
                 } else {
-                    document.getElementById('resultado').innerText = "Procurando objetos...";
+                    document.getElementById('resultado').innerText = "Procurando...";
                 }
                 detectar(); 
             });
@@ -136,6 +190,9 @@
                 
                 for (let i = 0; i < deteccoes.length; i++) {
                     let objeto = deteccoes[i];
+                    let nomeOriginal = objeto.label;
+                    let nomeTraduzido = dicionario[nomeOriginal] || nomeOriginal;
+
                     stroke(255, 215, 0); 
                     strokeWeight(4);
                     noFill();
@@ -143,7 +200,8 @@
                     noStroke();
                     fill(255, 215, 0);
                     textSize(20);
-                    text(objeto.label, objeto.x + 5, objeto.y + 20);
+                    // Desenha o nome traduzido no vídeo
+                    text(nomeTraduzido, objeto.x + 5, objeto.y + 20);
                 }
             }
         }
