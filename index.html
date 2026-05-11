@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assistente Visual para Idosos</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
+    <style>
+        /* Design de alto contraste para acessibilidade */
+        body { 
+            background-color: #121212; 
+            color: #FFD700; 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        h1 { font-size: 2.5em; }
+        #instrucao { font-size: 1.5em; color: #FFFFFF; }
+        
+        /* Área de resultado destacada e com fonte grande */
+        #resultado { 
+            font-size: 2.5em; 
+            margin: 20px auto; 
+            font-weight: bold; 
+            background: #333333; 
+            padding: 20px; 
+            border-radius: 15px; 
+            max-width: 80%;
+        }
+        
+        /* Estilização da área da câmera */
+        canvas { 
+            border: 5px solid #FFD700; 
+            border-radius: 10px; 
+            margin-top: 20px; 
+            max-width: 100%; 
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Assistente Visual</h1>
+    <p id="instrucao">Mostre um objeto para a câmera</p>
+    
+    <div id="resultado">Iniciando Inteligência Artificial...</div>
+
+    <script>
+        let video;
+        let detector;
+        let deteccoes = [];
+
+        // Função de configuração inicial (roda uma vez)
+        function setup() {
+            let canvas = createCanvas(640, 480);
+            canvas.parent(document.body);
+            
+            // Inicializa a webcam
+            video = createCapture(VIDEO);
+            video.size(640, 480);
+            video.hide(); // Esconde o vídeo padrão HTML para usar o Canvas do p5.js
+            
+            // Carrega o modelo de Machine Learning COCO-SSD
+            detector = ml5.objectDetector('cocossd', modelReady);
+        }
+
+        // Função chamada quando o modelo de IA termina de carregar
+        function modelReady() {
+            document.getElementById('resultado').innerText = "Sistema Pronto!";
+            detectar(); // Inicia o loop de detecção
+        }
+
+        // Função que processa os frames do vídeo e classifica os objetos
+        function detectar() {
+            detector.detect(video, function(error, results) {
+                if (error) { 
+                    console.error(error); 
+                    return; 
+                }
+                
+                deteccoes = results;
+                
+                if (deteccoes.length > 0) {
+                    // Seleciona o objeto detectado com maior nível de acurácia (confidence)
+                    let objetoPrincipal = deteccoes[0].label;
+                    let confianca = (deteccoes[0].confidence * 100).toFixed(0);
+                    
+                    document.getElementById('resultado').innerText = `Vejo: ${objetoPrincipal.toUpperCase()} (${confianca}% de certeza)`;
+                } else {
+                    document.getElementById('resultado').innerText = "Procurando objetos...";
+                }
+                
+                detectar(); // Loop contínuo para atualizar em tempo real
+            });
+        }
+
+        // Função de desenho para renderizar a câmera e as caixas delimitadoras
+        function draw() {
+            image(video, 0, 0);
+            
+            for (let i = 0; i < deteccoes.length; i++) {
+                let objeto = deteccoes[i];
+                
+                // Desenha a caixa ao redor do objeto
+                stroke(255, 215, 0); // Amarelo
+                strokeWeight(4);
+                noFill();
+                rect(objeto.x, objeto.y, objeto.width, objeto.height);
+                
+                // Escreve o nome do objeto (label) acima da caixa
+                noStroke();
+                fill(255, 215, 0);
+                textSize(24);
+                text(objeto.label, objeto.x + 10, objeto.y + 30);
+            }
+        }
+    </script>
+</body>
+</html>
