@@ -4,8 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Assistente Visual para Idosos</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#FFD700">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Assistente">
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
+
     <style>
         body { 
             background-color: #121212; 
@@ -30,20 +38,18 @@
             max-width: 400px;
         }
         
-        /* NOVO: A caixa que vai empilhar a câmera nativa e as caixas amarelas da IA */
         #container-camera {
             position: relative;
             width: 320px;
             height: 480px;
             margin: 10px auto;
-            display: none; /* Fica escondido até o usuário apertar Ligar */
+            display: none; 
             border: 4px solid #FFD700; 
             border-radius: 10px;
             overflow: hidden;
-            background-color: #000; /* Fundo preto caso a câmera demore a abrir */
+            background-color: #222;
         }
 
-        /* O vídeo nativo da Apple fica no fundo, preenchendo a caixa */
         #videoNativo {
             position: absolute;
             top: 0;
@@ -51,6 +57,7 @@
             width: 320px;
             height: 480px;
             object-fit: cover; 
+            z-index: 1;
         }
 
         button { 
@@ -75,10 +82,15 @@
     <div id="resultado" style="display: none;">Aguardando permissão...</div>
 
     <div id="container-camera">
-        <video id="videoNativo" autoplay playsinline muted></video>
+        <video id="videoNativo" width="320" height="480" autoplay playsinline muted></video>
     </div>
 
     <script>
+        // Registro do Service Worker para PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+
         let detector;
         let deteccoes = [];
         let sistemaIniciado = false;
@@ -87,6 +99,7 @@
         let ultimoObjetoFalado = "";
         let tempoUltimaFala = 0;
 
+        // Dicionário para tradução dos itens identificados pela IA
         const dicionario = {
             "person": "pessoa", "bicycle": "bicicleta", "car": "carro", "motorcycle": "moto",
             "airplane": "avião", "bus": "ônibus", "train": "trem", "truck": "caminhão",
@@ -114,8 +127,6 @@
 
         function setup() {
             let canvas = createCanvas(320, 480);
-            
-            // Joga o canvas de desenho para dentro do container, exatamente em cima do vídeo nativo
             canvas.parent('container-camera'); 
             canvas.style('position', 'absolute');
             canvas.style('top', '0');
@@ -125,6 +136,7 @@
             videoElement = document.getElementById('videoNativo');
         }
 
+        // Função para feedback de voz (essencial para acessibilidade)
         function falar(texto) {
             if ('speechSynthesis' in window && !window.speechSynthesis.speaking) {
                 let mensagem = new SpeechSynthesisUtterance(texto);
@@ -139,6 +151,9 @@
             document.getElementById('resultado').style.display = 'block'; 
             document.getElementById('resultado').innerText = "Solicitando permissão...";
 
+            // Exibe o container antes da permissão para evitar bloqueio no iOS
+            document.getElementById('container-camera').style.display = 'block'; 
+
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: "environment" },
@@ -149,15 +164,10 @@
                 
                 videoElement.onloadedmetadata = () => {
                     videoElement.play();
-                    
                     document.getElementById('resultado').innerText = "Carregando Inteligência Artificial...";
-                    
-                    // Exibe a caixa que contém o vídeo e o canvas
-                    document.getElementById('container-camera').style.display = 'block'; 
-                    
-                    // Teste inicial da voz APÓS a câmera estar rodando
                     falar("Assistente ligado.");
                     
+                    // Inicializa o detector com o vídeo nativo
                     detector = ml5.objectDetector('cocossd', videoElement, modelReady);
                     sistemaIniciado = true;
                 };
@@ -184,13 +194,13 @@
 
                     document.getElementById('resultado').innerText = `Vejo: ${nomeTraduzido.toUpperCase()} (${confianca}%)`;
 
+                    // Lógica de voz com cooldown de 4 segundos
                     let agora = Date.now();
                     if (nomeTraduzido !== ultimoObjetoFalado || (agora - tempoUltimaFala > 4000)) {
                         falar(nomeTraduzido);
                         ultimoObjetoFalado = nomeTraduzido;
                         tempoUltimaFala = agora;
                     }
-
                 } else {
                     document.getElementById('resultado').innerText = "Procurando...";
                 }
@@ -200,9 +210,7 @@
 
         function draw() {
             if(sistemaIniciado) {
-                // A MAGIA ACONTECE AQUI: Em vez de desenhar o vídeo, nós limpamos o canvas
-                // para ele ficar 100% transparente, já que o vídeo nativo está rodando atrás dele.
-                clear(); 
+                clear(); // Mantém o canvas transparente sobre o vídeo nativo
                 
                 for (let i = 0; i < deteccoes.length; i++) {
                     let objeto = deteccoes[i];
@@ -214,13 +222,12 @@
                     noFill();
                     rect(objeto.x, objeto.y, objeto.width, objeto.height);
                     
-                    // Fundo escuro pequeno atrás do texto para melhorar a leitura
                     noStroke();
                     fill(0, 0, 0, 180); 
-                    rect(objeto.x, objeto.y, 150, 30);
+                    rect(objeto.x, objeto.y, 160, 30);
 
                     fill(255, 215, 0);
-                    textSize(20);
+                    textSize(18);
                     text(nomeTraduzido, objeto.x + 5, objeto.y + 22);
                 }
             }

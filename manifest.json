@@ -1,0 +1,16 @@
+{
+  "name": "Assistente Visual para Idosos",
+  "short_name": "Assistente",
+  "description": "App de apoio visual com inteligência artificial",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#FFD700",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2983/2983067.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
