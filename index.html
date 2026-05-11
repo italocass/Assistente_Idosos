@@ -58,48 +58,55 @@
     <p id="instrucao">Aperte o botão para começar</p>
     
     <button id="btnLigar" onclick="iniciarSistema()">Ligar Câmera</button>
-    
     <div id="resultado" style="display: none;">Aguardando permissão...</div>
 
+    <video id="videoNativo" autoplay playsinline muted style="display: none;"></video>
+
     <script>
-        let video;
         let detector;
         let deteccoes = [];
         let sistemaIniciado = false;
+        let videoElement;
 
+        // Configura apenas o quadro de desenho (Canvas)
         function setup() {
             let canvas = createCanvas(320, 480);
             canvas.parent(document.body);
             canvas.id('meuCanvas'); 
+            videoElement = document.getElementById('videoNativo');
         }
 
-        function iniciarSistema() {
+        // Inicia usando a API Nativa do navegador (bypassa problemas do p5.js no iOS)
+        async function iniciarSistema() {
             document.getElementById('btnLigar').style.display = 'none'; 
             document.getElementById('resultado').style.display = 'block'; 
             document.getElementById('resultado').innerText = "Solicitando permissão da câmera...";
 
-            let constraints = {
-                video: { facingMode: { ideal: "environment" } },
-                audio: false
-            };
-            
-            video = createCapture(constraints, function(stream) {
-                document.getElementById('resultado').innerText = "Carregando IA... (Pode demorar uns segundos)";
-                document.getElementById('meuCanvas').style.display = 'inline'; 
+            try {
+                // Pede permissão usando o método oficial do HTML5
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment" },
+                    audio: false
+                });
                 
-                detector = ml5.objectDetector('cocossd', modelReady);
-                sistemaIniciado = true;
-            });
-            
-            // --- CÓDIGO CRÍTICO PARA O iPHONE/iOS FUNCIONAR ---
-            video.elt.setAttribute('playsinline', '');
-            video.elt.setAttribute('autoplay', '');
-            video.elt.setAttribute('muted', '');
-            video.elt.muted = true;
-            // --------------------------------------------------
+                // Conecta a câmara ao vídeo invisível
+                videoElement.srcObject = stream;
+                
+                // Quando o vídeo carregar, dispara a IA
+                videoElement.onloadedmetadata = () => {
+                    videoElement.play();
+                    document.getElementById('resultado').innerText = "Carregando IA... (Pode demorar uns segundos)";
+                    document.getElementById('meuCanvas').style.display = 'inline'; 
+                    
+                    detector = ml5.objectDetector('cocossd', modelReady);
+                    sistemaIniciado = true;
+                };
 
-            video.size(320, 480);
-            video.hide(); 
+            } catch (erro) {
+                // Se o iPhone bloquear, ele vai imprimir exatamente qual foi o erro aqui
+                document.getElementById('resultado').innerText = "Erro: " + erro.message;
+                console.error(erro);
+            }
         }
 
         function modelReady() {
@@ -108,7 +115,7 @@
         }
 
         function detectar() {
-            detector.detect(video, function(error, results) {
+            detector.detect(videoElement, function(error, results) {
                 if (error) { console.error(error); return; }
                 deteccoes = results;
                 
@@ -119,13 +126,15 @@
                 } else {
                     document.getElementById('resultado').innerText = "Procurando objetos...";
                 }
-                detectar();
+                detectar(); 
             });
         }
 
         function draw() {
             if(sistemaIniciado) {
-                image(video, 0, 0, width, height); 
+                // Desenha os fotogramas da câmara nativa no ecrã
+                image(videoElement, 0, 0, width, height); 
+                
                 for (let i = 0; i < deteccoes.length; i++) {
                     let objeto = deteccoes[i];
                     stroke(255, 215, 0); 
