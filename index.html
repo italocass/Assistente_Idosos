@@ -14,35 +14,38 @@
             font-family: Arial, sans-serif; 
             text-align: center; 
             margin: 0; 
-            padding: 20px; 
+            padding: 15px; 
+            overflow-x: hidden; /* Evita rolagem horizontal no celular */
         }
-        h1 { font-size: 2.5em; }
-        #instrucao { font-size: 1.5em; color: #FFFFFF; }
+        h1 { font-size: 2em; margin-bottom: 5px; }
+        #instrucao { font-size: 1.2em; color: #FFFFFF; margin-bottom: 15px; }
         
         /* Área de resultado destacada e com fonte grande */
         #resultado { 
-            font-size: 2.5em; 
-            margin: 20px auto; 
+            font-size: 1.5em; 
+            margin: 10px auto; 
             font-weight: bold; 
             background: #333333; 
-            padding: 20px; 
-            border-radius: 15px; 
-            max-width: 80%;
+            padding: 15px; 
+            border-radius: 10px; 
+            width: 90%;
+            max-width: 400px;
         }
         
         /* Estilização da área da câmera */
         canvas { 
-            border: 5px solid #FFD700; 
+            border: 4px solid #FFD700; 
             border-radius: 10px; 
-            margin-top: 20px; 
+            margin-top: 10px; 
             max-width: 100%; 
+            height: auto; /* Mantém a proporção correta no ecrã */
         }
     </style>
 </head>
 <body>
 
     <h1>Assistente Visual</h1>
-    <p id="instrucao">Mostre um objeto para a câmera</p>
+    <p id="instrucao">Aponte a câmera para um objeto</p>
     
     <div id="resultado">Iniciando Inteligência Artificial...</div>
 
@@ -53,13 +56,26 @@
 
         // Função de configuração inicial (roda uma vez)
         function setup() {
-            let canvas = createCanvas(640, 480);
+            // Criando o canvas com um tamanho que se adapte melhor ao celular (320x480)
+            let canvas = createCanvas(320, 480);
             canvas.parent(document.body);
             
-            // Inicializa a webcam
-            video = createCapture(VIDEO);
-            video.size(640, 480);
-            video.hide(); // Esconde o vídeo padrão HTML para usar o Canvas do p5.js
+            // Configuração específica para mobile: forçar a câmera traseira
+            let constraints = {
+                video: {
+                    facingMode: "environment" // "user" seria a câmera frontal
+                },
+                audio: false
+            };
+            
+            // Inicializa a webcam com as configurações de celular
+            video = createCapture(constraints);
+            
+            // Essa linha é OBRIGATÓRIA para a câmera funcionar no iPhone/Safari e não abrir em tela cheia
+            video.elt.setAttribute('playsinline', '');
+            
+            video.size(320, 480);
+            video.hide(); // Esconde o vídeo HTML nativo para desenhar no nosso Canvas
             
             // Carrega o modelo de Machine Learning COCO-SSD
             detector = ml5.objectDetector('cocossd', modelReady);
@@ -68,7 +84,7 @@
         // Função chamada quando o modelo de IA termina de carregar
         function modelReady() {
             document.getElementById('resultado').innerText = "Sistema Pronto!";
-            detectar(); // Inicia o loop de detecção
+            detectar(); // Inicia o loop de detecção contínua
         }
 
         // Função que processa os frames do vídeo e classifica os objetos
@@ -97,7 +113,8 @@
 
         // Função de desenho para renderizar a câmera e as caixas delimitadoras
         function draw() {
-            image(video, 0, 0);
+            // Desenha o vídeo ocupando o tamanho total do canvas
+            image(video, 0, 0, width, height); 
             
             for (let i = 0; i < deteccoes.length; i++) {
                 let objeto = deteccoes[i];
@@ -111,8 +128,8 @@
                 // Escreve o nome do objeto (label) acima da caixa
                 noStroke();
                 fill(255, 215, 0);
-                textSize(24);
-                text(objeto.label, objeto.x + 10, objeto.y + 30);
+                textSize(20);
+                text(objeto.label, objeto.x + 5, objeto.y + 20);
             }
         }
     </script>
