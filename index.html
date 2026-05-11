@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Assistente Visual para Idosos</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
-    <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
+    <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
     <style>
         body { 
             background-color: #121212; 
@@ -30,7 +30,6 @@
             max-width: 400px;
         }
         
-        /* Oculta o canvas da câmera até o botão ser clicado */
         canvas { 
             border: 4px solid #FFD700; 
             border-radius: 10px; 
@@ -40,7 +39,6 @@
             display: none; 
         }
 
-        /* Estilo do botão de ligar */
         button { 
             background-color: #FFD700; 
             color: #121212; 
@@ -69,41 +67,41 @@
         let deteccoes = [];
         let sistemaIniciado = false;
 
-        // Configuração inicial da tela (roda sozinho)
         function setup() {
             let canvas = createCanvas(320, 480);
             canvas.parent(document.body);
-            canvas.id('meuCanvas'); // Cria um ID para podermos manipular no CSS depois
+            canvas.id('meuCanvas'); 
         }
 
-        // Função que só roda quando o usuário clica no botão
         function iniciarSistema() {
-            document.getElementById('btnLigar').style.display = 'none'; // Esconde o botão
-            document.getElementById('resultado').style.display = 'block'; // Mostra a caixa de texto
+            document.getElementById('btnLigar').style.display = 'none'; 
+            document.getElementById('resultado').style.display = 'block'; 
             document.getElementById('resultado').innerText = "Solicitando permissão da câmera...";
 
             let constraints = {
-                video: { facingMode: "environment" },
+                video: { facingMode: { ideal: "environment" } },
                 audio: false
             };
             
-            // Inicializa a câmera
             video = createCapture(constraints, function(stream) {
-                // Esse bloco só roda quando você clica em "Permitir" no celular
                 document.getElementById('resultado').innerText = "Carregando IA... (Pode demorar uns segundos)";
                 document.getElementById('meuCanvas').style.display = 'inline'; 
-                video.elt.setAttribute('playsinline', '');
                 
-                // Carrega o modelo de Machine Learning COCO-SSD
                 detector = ml5.objectDetector('cocossd', modelReady);
                 sistemaIniciado = true;
             });
             
+            // --- CÓDIGO CRÍTICO PARA O iPHONE/iOS FUNCIONAR ---
+            video.elt.setAttribute('playsinline', '');
+            video.elt.setAttribute('autoplay', '');
+            video.elt.setAttribute('muted', '');
+            video.elt.muted = true;
+            // --------------------------------------------------
+
             video.size(320, 480);
             video.hide(); 
         }
 
-        // Função chamada quando a IA termina de baixar no navegador
         function modelReady() {
             document.getElementById('resultado').innerText = "Sistema Pronto! Aponte para um objeto.";
             detectar(); 
