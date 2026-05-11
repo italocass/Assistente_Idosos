@@ -60,7 +60,7 @@
     <button id="btnLigar" onclick="iniciarSistema()">Ligar Câmera</button>
     <div id="resultado" style="display: none;">Aguardando permissão...</div>
 
-    <video id="videoNativo" autoplay playsinline muted style="display: none;"></video>
+    <video id="videoNativo" width="320" height="480" autoplay playsinline muted style="display: none;"></video>
 
     <script>
         let detector;
@@ -68,7 +68,6 @@
         let sistemaIniciado = false;
         let videoElement;
 
-        // Configura apenas o quadro de desenho (Canvas)
         function setup() {
             let canvas = createCanvas(320, 480);
             canvas.parent(document.body);
@@ -76,34 +75,35 @@
             videoElement = document.getElementById('videoNativo');
         }
 
-        // Inicia usando a API Nativa do navegador (bypassa problemas do p5.js no iOS)
         async function iniciarSistema() {
             document.getElementById('btnLigar').style.display = 'none'; 
             document.getElementById('resultado').style.display = 'block'; 
             document.getElementById('resultado').innerText = "Solicitando permissão da câmera...";
 
             try {
-                // Pede permissão usando o método oficial do HTML5
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: "environment" },
                     audio: false
                 });
                 
-                // Conecta a câmara ao vídeo invisível
                 videoElement.srcObject = stream;
                 
-                // Quando o vídeo carregar, dispara a IA
                 videoElement.onloadedmetadata = () => {
                     videoElement.play();
+                    
+                    // CORREÇÃO 2: Reforço as dimensões no JavaScript antes de chamar a IA
+                    videoElement.width = 320;
+                    videoElement.height = 480;
+                    
                     document.getElementById('resultado').innerText = "Carregando IA... (Pode demorar uns segundos)";
                     document.getElementById('meuCanvas').style.display = 'inline'; 
                     
-                    detector = ml5.objectDetector('cocossd', modelReady);
+                    // CORREÇÃO 3: Passamos o vídeo DIRETAMENTE na inicialização para a IA não se perder
+                    detector = ml5.objectDetector('cocossd', videoElement, modelReady);
                     sistemaIniciado = true;
                 };
 
             } catch (erro) {
-                // Se o iPhone bloquear, ele vai imprimir exatamente qual foi o erro aqui
                 document.getElementById('resultado').innerText = "Erro: " + erro.message;
                 console.error(erro);
             }
@@ -132,7 +132,6 @@
 
         function draw() {
             if(sistemaIniciado) {
-                // Desenha os fotogramas da câmara nativa no ecrã
                 image(videoElement, 0, 0, width, height); 
                 
                 for (let i = 0; i < deteccoes.length; i++) {
